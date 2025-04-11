@@ -11,6 +11,9 @@ public class InspectionSystem : MonoBehaviour
     [SerializeField] private Transform _model;
     [SerializeField] private Camera _inspectionCamera;
     [SerializeField] private LayerMask _modelLayer;
+
+    private string _savedDataFolder = @"C:\temp";
+    private int _resultCount;
     public void CalculatePointData()
     {
         _pointDataList.Clear();
@@ -106,19 +109,32 @@ public class InspectionSystem : MonoBehaviour
         // Log the JSON string
         Debug.Log($" Result is {json}");
     }
-    public static void SaveJson(string json, string filename = "inspection_result.json")
+    private void SaveJson(string json, string filename = "inspection_result.json")
     {
-        string path = Path.Combine(@"C:\temp", filename);
+        _resultCount++;
+        string path = Path.Combine(GetPath(), filename);
         File.WriteAllText(path, json);
         Debug.Log($"JSON saved to: {path}");
+       
     }
     public void SaveMainCameraImage()
     {
-        FindObjectOfType<CameraCapture>().SaveImage(Camera.main,Screen.width,Screen.height);
+        FindObjectOfType<CameraCapture>().SaveImage(Camera.main,Screen.width,Screen.height,GetPath());
     }
     public void SaveInspectionCameraImage()
     {
-        FindObjectOfType<CameraCapture>().SaveImage(_inspectionCamera);
+        FindObjectOfType<CameraCapture>().SaveImage(_inspectionCamera,path:GetPath());
+    }
+    private string GetPath()
+    {
+        string path = Path.Combine(_savedDataFolder, "_results", _resultCount.ToString());
+        if (!Directory.Exists(path))
+        {
+            Directory.CreateDirectory(path);
+        }
+
+        return path;
+      
     }
     float WrapAngle(float angle)
     {

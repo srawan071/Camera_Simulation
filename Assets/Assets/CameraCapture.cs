@@ -46,16 +46,18 @@ public class CameraCapture : MonoBehaviour
         }
     }
 
-    public void SaveImage(Camera camera, int Width=0, int Height=0)
+    public void SaveImage(Camera camera, int Width=0, int Height=0, string path=null)
     {
+       
         Width= Width==0 ? imageWidth : Width; 
         Height= Height==0 ? imageHeight: Height;
-        ImageDataPath = savedDataFolder + "\\image_" + imagesTaken;
+        ImageDataPath =path==null? savedDataFolder + "\\image_" + imagesTaken: path;
+       
         if (!Directory.Exists(ImageDataPath))
         {
             Directory.CreateDirectory(ImageDataPath);
         }
-        Debug.Log(camera);
+        //Debug.Log(camera);
         VRCameraCapture(camera, Width, Height);
     }
     public void VRCameraCapture(Camera camera, int width, int height)
@@ -115,6 +117,7 @@ public class CameraCapture : MonoBehaviour
 
         }
     }
+   
     void CreatCameraJson(Camera camera/*, Matrix4x4 transformation*/)
     {
         CameraData cameraData = new CameraData();
