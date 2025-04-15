@@ -1,7 +1,7 @@
 
 using UnityEngine;
 using UnityEngine.UI;
-
+using UnityEngine.EventSystems;
 public class CameraController : MonoBehaviour
 {
     [SerializeField]
@@ -39,14 +39,22 @@ public class CameraController : MonoBehaviour
 
     void Update()
     {
+        // Prevent camera movement if pointer is over UI
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            return;
         HandleRotation();
         HandleZoom();
         HandlePan();
     }
     public void OnToggleCamera(bool toggle)
-    {
+    {Debug.Log(" On camera toggle "+ _inspectionCamera);
+        if(_inspectionCamera == null&& toggle)
+        {
+            _cameraToggle.isOn = false;
+            return;
+        }
         _cameraTransform= toggle?_inspectionCamera.transform: _mainCamera.transform;
-       // Debug.Log($" Toggle value is "+ toggle + " camera transform"+ _cameraTransform);
+        Debug.Log($" Toggle value is "+ toggle + " camera transform"+ _cameraTransform);
     }
     public void OnToggleRotateAround(bool toggle)
     {
@@ -106,6 +114,23 @@ public class CameraController : MonoBehaviour
     {
         _cameraToggle.onValueChanged.RemoveListener(OnToggleCamera);
         _rotateAroundToggle.onValueChanged.RemoveListener(OnToggleRotateAround);
+    }
+    public void SetSelectedInspectionCamera(Camera camera)
+    {
+        _inspectionCamera = camera;
+       /* if (_inspectionCamera != null && _cameraTransform!= _mainCamera.transform) { 
+            _cameraTransform = _inspectionCamera.transform;}*/
+       Debug.Log(" Camera Controller "+  _inspectionCamera);
+        if (_inspectionCamera != null)
+        {
+            _cameraToggle.SetIsOnWithoutNotify(false);
+            _cameraToggle.isOn = true; // This will now fire the event
+        }
+        else
+        {
+            _cameraToggle.isOn = false;
+        }
+
     }
 }
 

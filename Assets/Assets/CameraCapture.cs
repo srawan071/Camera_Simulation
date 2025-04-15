@@ -34,6 +34,8 @@ public class CameraCapture : MonoBehaviour
 
         cameraObj.projectionMatrix = projectionMatrix(cameraObj.projectionMatrix, cameraObj.nearClipPlane);
 
+        Debug.Log(" Camera Projection matrix\n"+ cameraObj.projectionMatrix);
+
     }
 
     // Update is called once per frame
@@ -138,6 +140,7 @@ public class CameraCapture : MonoBehaviour
         string inputData = JsonUtility.ToJson(cameraData, true);
         File.WriteAllText(ImageDataPath + "\\CameraData.json", inputData);
     }
+   
     public Matrix4x4 projectionMatrix(Matrix4x4 org, double near)
     {
         var cx = intrinsics.ppx;
@@ -146,25 +149,28 @@ public class CameraCapture : MonoBehaviour
         var fy = intrinsics.fy;
 
         var right = near * (imageWidth - cx) / fx;
-        var left = near * (1 - cx) / fx;
-        var bottom = near * (1 - cy) / fy;
-        var top = near * (imageHeight - cy) / fy;
+        var left = near * (-cx) / fx;
+        var top = near * (cy) / fy;
+        var bottom = near * (cy - imageHeight) / fy;
 
-        var x = (float)(2 * near / (right - left));
-        var y = (float)(2 * near / (top - bottom));
-        var a = (float)((right + left) / (right - left));
-        var b = (float)((top + bottom) / (top - bottom));
+        float zNear = (float)near;
+        float zFar = cameraObj.farClipPlane;
 
-        //float fov = 2.0f * Mathf.Atan(1.0f / y) * 180.0f / Mathf.PI;
-        //Debug.Log(fov);
+        float x = (float)(2.0 * near / (right - left));
+        float y = (float)(2.0 * near / (top - bottom));
+        float a = (float)((right + left) / (right - left));
+        float b = (float)((top + bottom) / (top - bottom));
+        float c = -(zFar + zNear) / (zFar - zNear);
+        float d = -(2.0f * zFar * zNear) / (zFar - zNear);
 
+        Matrix4x4 mat = new Matrix4x4();
 
-        org.m00 = x;
-        org.m02 = a;
-        org.m11 = y;
-        org.m12 = b;
+        mat.m00 = x; mat.m01 = 0; mat.m02 = a; mat.m03 = 0;
+        mat.m10 = 0; mat.m11 = y; mat.m12 = b; mat.m13 = 0;
+        mat.m20 = 0; mat.m21 = 0; mat.m22 = c; mat.m23 = d;
+        mat.m30 = 0; mat.m31 = 0; mat.m32 = -1f; mat.m33 = 0;
 
-        return org;
+        return mat;
     }
 
     [System.Serializable]
