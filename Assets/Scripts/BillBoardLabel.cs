@@ -29,7 +29,6 @@ public class BillboardLabel : MonoBehaviour
             _backgroundSprite = GetComponentInChildren<SpriteRenderer>();
         }
 
-        Debug.Log(" From Start");
         UpdateBackgroundSize();
     }
 
@@ -87,13 +86,13 @@ public class BillboardLabel : MonoBehaviour
         _backgroundSprite.sortingOrder = _textMeshPro.sortingOrder - 1;
     }
 
-
+/*
     private void OnValidate()
     {
         if (_textMeshPro != null && _backgroundSprite != null)
         {
-            Debug.Log(" on validate");
+            
             UpdateBackgroundSize();
         }
-    }
+    }*/
 }

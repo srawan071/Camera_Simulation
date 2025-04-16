@@ -9,44 +9,58 @@ public class InspectionSystem : MonoBehaviour
     [SerializeField] private List<PointData> _pointDataList = new List<PointData>();
     [SerializeField] private GameObject _pointPrefab;
     [SerializeField] private Transform _model;
-    [SerializeField] private Camera _inspectionCamera;
     [SerializeField] private LayerMask _modelLayer;
+    [SerializeField] private CameraListPanel _cameraList;
 
+    private Camera _inspectionCamera;
     private string _savedDataFolder = @"C:\temp";
     private int _resultCount;
+
+    private void Awake()
+    {
+        _resultCount = PlayerPrefs.GetInt("RESULT");
+    }
     public void CalculatePointData()
     {
-        _pointDataList.Clear();
-        foreach (var point in _points)
+        Camera[] allcameras= _cameraList.GetAllCamera();
+        foreach (Camera cam in allcameras)
         {
-            Vector3 positionInWorldSpace = point.transform.position;
-            Vector3 positionInCameraSpace = _inspectionCamera.transform.InverseTransformPoint(positionInWorldSpace);
-
-
-
-            bool inFOV = CameraUtils.IsPointVisibleInCameraFOV(positionInWorldSpace, _inspectionCamera);
-            bool occluded = CameraUtils.IsPointOccluded(point, _inspectionCamera);
-            bool visible = inFOV && !occluded;
-           
-            float? angle = CameraUtils.GetSurfaceAngleToCamera(positionInWorldSpace, _inspectionCamera,_modelLayer);
-            float distanceMM = CameraUtils.DistanceToPointInMM(positionInWorldSpace, _inspectionCamera);
-
-            _pointDataList.Add(new PointData
+            _inspectionCamera= cam;
+            _pointDataList.Clear();
+            foreach (var point in _points)
             {
-                PositionInWorldCordinate = positionInWorldSpace,
-                PositionInCameraCordinate = positionInCameraSpace,
-                IsVisible = visible,
-                IsOccluded = occluded,
-                IsInFov = inFOV,
-                SurfaceAngle = angle.ToString(),
-                DistanceToPointMM = distanceMM
-            });
+                Vector3 positionInWorldSpace = point.transform.position;
+                Vector3 positionInCameraSpace = _inspectionCamera.transform.InverseTransformPoint(positionInWorldSpace);
 
-            SetColor(point, inFOV,occluded, angle);
+
+
+                bool inFOV = CameraUtils.IsPointVisibleInCameraFOV(positionInWorldSpace, _inspectionCamera);
+                bool occluded = CameraUtils.IsPointOccluded(point, _inspectionCamera);
+                bool visible = inFOV && !occluded;
+
+                float? angle = CameraUtils.GetSurfaceAngleToCamera(positionInWorldSpace, _inspectionCamera, _modelLayer);
+                float distanceMM = CameraUtils.DistanceToPointInMM(positionInWorldSpace, _inspectionCamera);
+
+                _pointDataList.Add(new PointData
+                {
+                    PositionInWorldCordinate = positionInWorldSpace,
+                    PositionInCameraCordinate = positionInCameraSpace,
+                    IsVisible = visible,
+                    IsOccluded = occluded,
+                    IsInFov = inFOV,
+                    SurfaceAngle = angle.ToString(),
+                    DistanceToPointMM = distanceMM
+                });
+
+                SetColor(point, inFOV, occluded, angle);
+            }
+
+
+            ShowPointData(_inspectionCamera.name);
+            SaveInspectionCameraImage(_inspectionCamera);
         }
 
-      //  Debug.Log("Point data collected: " + _pointDataList.Count);
-        ShowPointData();
+        UpdateResultCount();
     }
 
     void SetColor(GameObject point, bool inFov, bool isOccluded,float? angle)
@@ -89,29 +103,30 @@ public class InspectionSystem : MonoBehaviour
 
     }
 
-    public void ShowPointData()
+    public void ShowPointData(string camName)
     {
-        Vector3 cameraPos = _inspectionCamera.transform.position;
+        CameraData camData = _inspectionCamera.transform.GetComponent<CameraCapture>().GetCameraData(_inspectionCamera);
+       
         Vector3 CameraRot = new Vector3(
         WrapAngle(_inspectionCamera.transform.eulerAngles.x),
         WrapAngle(_inspectionCamera.transform.eulerAngles.y),
         WrapAngle(_inspectionCamera.transform.eulerAngles.z));
 
+        
         string json = JsonUtility.ToJson(new PointDataListWrapper
         {
-            CameraPos = cameraPos,
-            CameraRotation = CameraRot,
+           cameraData= camData,
             points = _pointDataList
 
         }, true);
 
-        SaveJson(json);
+        SaveJson(json,$"{camName}_result.json");
         // Log the JSON string
         Debug.Log($" Result is {json}");
     }
     private void SaveJson(string json, string filename = "inspection_result.json")
     {
-        _resultCount++;
+        
         string path = Path.Combine(GetPath(), filename);
         File.WriteAllText(path, json);
         Debug.Log($"JSON saved to: {path}");
@@ -121,9 +136,9 @@ public class InspectionSystem : MonoBehaviour
     {
         FindObjectOfType<CameraCapture>().SaveImage(Camera.main,Screen.width,Screen.height,GetPath());
     }
-    public void SaveInspectionCameraImage()
+    public void SaveInspectionCameraImage(Camera cam)
     {
-        FindObjectOfType<CameraCapture>().SaveImage(_inspectionCamera,path:GetPath());
+        cam.transform.GetComponent<CameraCapture>().SaveImage(_inspectionCamera,path:GetPath());
     }
     private string GetPath()
     {
@@ -136,6 +151,11 @@ public class InspectionSystem : MonoBehaviour
         return path;
       
     }
+    private void UpdateResultCount()
+    {
+        _resultCount++;
+        PlayerPrefs.SetInt("RESULT", _resultCount);
+    }
     float WrapAngle(float angle)
     {
         angle %= 360f;
@@ -146,8 +166,7 @@ public class InspectionSystem : MonoBehaviour
     [System.Serializable]
     public class PointDataListWrapper
     {
-        public Vector3 CameraPos;
-        public Vector3 CameraRotation;
+        public CameraData cameraData;
         public List<PointData> points;
 
     }

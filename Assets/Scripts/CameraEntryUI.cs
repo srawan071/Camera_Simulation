@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -12,33 +13,70 @@ public class CameraEntryUI : MonoBehaviour
     [SerializeField] private Button _deleteButton;
     [SerializeField] private Image _background;
 
-    [HideInInspector] public GameObject TargetCamera;
-    private CameraListPanel listPanel;
+    [HideInInspector] public Camera Camera;
+    private CameraListPanel _listPanel;
 
     private Color _initialColor;
 
-    public void Setup(string cameraName, GameObject cameraObj, CameraListPanel panel)
-    {
-        _initialColor= _background.color;
+    private CameraModel _selectedCameraModel;
+    private LensModel _selectedLensModel;
 
-        TargetCamera = cameraObj;
-        listPanel = panel;
+    public void Setup(string cameraName, Camera cameraObj, CameraListPanel panel)
+    {
+        _initialColor = _background.color;
+
+        Camera = cameraObj;
+        cameraObj.enabled = false;
+        _listPanel = panel;
         _cameraNameText.text = cameraName;
 
-        TargetCamera.GetComponentInChildren<BillboardLabel>().SetText(cameraName);
+        Camera.GetComponentInChildren<BillboardLabel>().SetText(cameraName);
 
-        _selectButton.onClick.AddListener(() => listPanel.SelectCamera(this));
-        _deleteButton.onClick.AddListener(() => listPanel.DeleteCamera(this));
+        _selectButton.onClick.AddListener(() => _listPanel.SelectCamera(this));
+        _deleteButton.onClick.AddListener(() => _listPanel.DeleteCamera(this));
 
-        _cameraModelDropdown.ClearOptions();
-        _cameraModelDropdown.AddOptions(new List<string> { "Model A", "Model B", "Model C", "Model D", "Model E", "Model F"});
-
-        _lensModelDropdown.ClearOptions();
-        _lensModelDropdown.AddOptions(new List<string> { "Lens W", "Lens X", "Lens Y", "Lens Z" });
+        SetupDropdowns();
     }
 
     public void SetHighlight(bool isHighlighted)
     {
         _background.color = isHighlighted ? Color.yellow : _initialColor;
+    }
+
+    private void SetupDropdowns()
+    {
+        // Camera model dropdown
+        _cameraModelDropdown.ClearOptions();
+        List<string> cameraOptions = new List<string>(Enum.GetNames(typeof(CameraModel)));
+        _cameraModelDropdown.AddOptions(cameraOptions);
+        _cameraModelDropdown.onValueChanged.AddListener(OnCameraModelChanged);
+        OnCameraModelChanged(0); // Initialize
+
+        // Lens model dropdown
+        _lensModelDropdown.ClearOptions();
+        List<string> lensOptions = new List<string>(Enum.GetNames(typeof(LensModel)));
+        _lensModelDropdown.AddOptions(lensOptions);
+        _lensModelDropdown.onValueChanged.AddListener(OnLensModelChanged);
+        OnLensModelChanged(0); // Initialize
+    }
+
+    private void OnCameraModelChanged(int index)
+    {
+        _selectedCameraModel = (CameraModel)index;
+        ApplyToCameraCapture();
+    }
+
+    private void OnLensModelChanged(int index)
+    {
+        _selectedLensModel = (LensModel)index;
+        ApplyToCameraCapture();
+    }
+    private void ApplyToCameraCapture()
+    {
+        var cameraCapture = Camera.GetComponent<CameraCapture>();
+        if (cameraCapture != null)
+        {
+            cameraCapture.InitializeFromModels(_selectedCameraModel, _selectedLensModel);
+        }
     }
 }

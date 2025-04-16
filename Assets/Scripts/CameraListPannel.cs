@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
+using System.Linq;
 
 public class CameraListPanel : MonoBehaviour
 {
@@ -19,7 +20,7 @@ public class CameraListPanel : MonoBehaviour
 
     [Header("Settings")]
     [SerializeField]
-    private GameObject _cameraPrefab; // Prefab with a Camera component
+    private Camera _cameraPrefab; // Prefab with a Camera component
 
     private int cameraCount = 0;
     private List<CameraEntryUI> cameraEntries = new List<CameraEntryUI>();
@@ -42,7 +43,7 @@ public class CameraListPanel : MonoBehaviour
         cameraCount++;
 
        // Vector3 defaultPosition = new Vector3(cameraCount * 2, 1, 0); // offset placement
-        GameObject newCamera = Instantiate(_cameraPrefab, _defaultSpawnPos, Quaternion.identity);
+        Camera newCamera = Instantiate(_cameraPrefab, _defaultSpawnPos, Quaternion.identity);
         newCamera.name = $"Camera {cameraCount}";
 
         GameObject entry = Instantiate(_cameraEntryPrefab, _cameraListContent);
@@ -67,9 +68,9 @@ public class CameraListPanel : MonoBehaviour
         selectedEntry = entry;
         selectedEntry.SetHighlight(true);
 
-        FocusCamera(entry.TargetCamera);
+        FocusCamera(entry.Camera);
 
-        _selectedCameraPanel.SetSelectedCamera(entry.TargetCamera);
+        _selectedCameraPanel.SetSelectedCamera(entry.Camera.gameObject);
 
     }
     public void DeselectCamera()
@@ -78,10 +79,12 @@ public class CameraListPanel : MonoBehaviour
         {
             selectedEntry.SetHighlight(false);
 
-            Camera camComponent = selectedEntry.TargetCamera.GetComponent<Camera>();
+            Camera camComponent = selectedEntry.Camera;
             if (camComponent != null)
             {
                 camComponent.targetTexture = null;
+                camComponent.enabled = false;
+                ClearRenderTexture();
             }
 
             _selectedCameraPanel.SetSelectedCamera(null);
@@ -106,21 +109,24 @@ public class CameraListPanel : MonoBehaviour
        
 
         cameraEntries.Remove(entry);
-        Destroy(entry.TargetCamera);
+        Destroy(entry.Camera.gameObject);
         Destroy(entry.gameObject);
     }
 
-    private void FocusCamera(GameObject selectedCamera)
+    private void FocusCamera(Camera selectedCamera)
     {
+        bool anyCameraActive = false;
+
         foreach (var entry in cameraEntries)
         {
-            Camera camComponent = entry.TargetCamera.GetComponent<Camera>();
+            Camera camComponent = entry.Camera;
             if (camComponent != null)
             {
-                if (entry.TargetCamera == selectedCamera)
+                if (entry.Camera == selectedCamera)
                 {
                     camComponent.targetTexture = _sharedRenderTexture;
-
+                    camComponent.enabled = true;
+                    anyCameraActive = true;
                     // Set selected camera in external controllers
                     _cameraController.SetSelectedInspectionCamera(camComponent);
                     _cameraFrustumDrawer.SetSelectedInspectionCamera(camComponent);
@@ -128,8 +134,25 @@ public class CameraListPanel : MonoBehaviour
                 else
                 {
                     camComponent.targetTexture = null;
+                    camComponent.enabled = false;
                 }
             }
         }
+        if (!anyCameraActive)
+        {
+            ClearRenderTexture(); // Clear if no camera is active
+        }
+    }
+    private void ClearRenderTexture()
+    {
+        RenderTexture currentRT = RenderTexture.active;
+        RenderTexture.active = _sharedRenderTexture;
+        GL.Clear(true, true, Color.clear);
+        RenderTexture.active = currentRT;
+    }
+
+    public Camera[] GetAllCamera()
+    {
+        return cameraEntries.Select(entry => entry.Camera).ToArray();
     }
 }

@@ -42,7 +42,7 @@ Camera:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5278762781647137937}
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 2
   m_ClearFlags: 2
   m_BackGroundColor: {r: 0, g: 0, b: 0, a: 1}
@@ -99,10 +99,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   imagesTaken: 0
+  selectedCameraModel: 0
+  selectedLensModel: 0
   imageWidth: 5472
   imageHeight: 3648
-  gameObj: {fileID: 0}
   cameraObj: {fileID: 190446454887656235}
+  gameObj: {fileID: 0}
 --- !u!1001 &1552078541626075110
 PrefabInstance:
   m_ObjectHideFlags: 0
