@@ -20,20 +20,20 @@ public static class CameraUtils
             if (hit.collider != point.GetComponent<Collider>())
             {
                 // The hit collider is not the sphere's collider, indicating occlusion
-              //  Debug.Log("Hit is true");
+                //  Debug.Log("Hit is true");
                 return true;
             }
             else
             {
                 // The hit collider is the sphere's collider, meaning it's not occluded
-              //  Debug.Log("Hit sphere itself");
+                //  Debug.Log("Hit sphere itself");
                 return false;
             }
         }
         else
         {
             // Raycast did not hit anything
-           // Debug.Log("Raycast does not hit anything");
+            // Debug.Log("Raycast does not hit anything");
             return false;
         }
     }
@@ -43,19 +43,23 @@ public static class CameraUtils
         Vector3 screenPoint = camera.WorldToScreenPoint(point);
         return Vector3.Distance(new Vector3(Screen.width / 2f, Screen.height / 2f, 0f), screenPoint);
     }
-    public static float DistanceFromCamera(Vector3 point,Camera camera)
+    public static float DistanceFromCamera(Vector3 point, Camera camera)
     {
         return Vector3.Distance(camera.transform.position, point);
     }
     public static float DistanceToPointInMM(Vector3 point, Camera camera)
     {
-        float distanceInPixels = DistanceToPointInPixels(point,camera);
+        float distanceInPixels = DistanceToPointInPixels(point, camera);
         float dpi = Screen.dpi == 0 ? 96f : Screen.dpi; // fallback DPI if unknown
         return distanceInPixels / dpi * 25.4f;
     }
 
-    public static float? GetSurfaceAngleToCamera(Vector3 point,Camera camera,LayerMask layerMask)
+    public static float? GetSurfaceAngleToCamera(Vector3 point, Camera camera, LayerMask layerMask)
     {
+        if (!IsPointVisibleInCameraFOV(point, camera))
+        {
+            return null;
+        }
         Vector3 camPos = camera.transform.position;
         Vector3 pointPos = point;
 
@@ -63,13 +67,13 @@ public static class CameraUtils
         Vector3 cameraToPoint = (pointPos - camPos).normalized;
         Ray ray = new Ray(camPos, cameraToPoint);
         float maxDistance = camera.farClipPlane; // Limit ray distance to camera's view range
-      //  Debug.Log(" Before Raycast");
+                                                 //  Debug.Log(" Before Raycast");
         if (Physics.Raycast(ray, out RaycastHit hit, maxDistance, layerMask))
         {
-           // Debug.Log(" rayCast Hit"+ hit.transform.gameObject.name);
+            // Debug.Log(" rayCast Hit"+ hit.transform.gameObject.name);
 
             // Ensure that the hit point is close enough to the Model Surface
-            float distanceThreshold = 5f;
+            float distanceThreshold = 3f;
             if (Vector3.Distance(hit.point, pointPos) < distanceThreshold)
             {
 
@@ -88,16 +92,16 @@ public static class CameraUtils
             }
             else
             {
-                
+
                 /// Raycasts  hits the surface of the 3D mesh, but far from the distance threshold from the point.
-               
+
 
 
             }
 
         }
         return HoleSurfaceNormalEstimation();
-       
+
     }
     public static float? HoleSurfaceNormalEstimation()
     {

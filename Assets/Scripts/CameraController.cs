@@ -27,6 +27,8 @@ public class CameraController : MonoBehaviour
     [SerializeField]
     private bool _rotateAroundOrigin;
 
+    [SerializeField]
+    private GameObject _3DViewTab;
 
     void Start()
     {
@@ -39,6 +41,8 @@ public class CameraController : MonoBehaviour
 
     void Update()
     {
+        if (!Is3dViewActive())
+            return;
         // Prevent camera movement if pointer is over UI
         if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
             return;
@@ -128,6 +132,10 @@ public class CameraController : MonoBehaviour
             _cameraToggle.isOn = false;
         }
 
+    }
+    private bool Is3dViewActive()
+    {
+        return _3DViewTab.activeInHierarchy;
     }
 }
 

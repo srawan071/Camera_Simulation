@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System;
 using System.IO;
-using Newtonsoft.Json;
+
 public class InspectionSystem : MonoBehaviour
 {
     [SerializeField] public GameObject[] _points; // Assign spheres in the Inspector
@@ -12,9 +12,17 @@ public class InspectionSystem : MonoBehaviour
     [SerializeField] private LayerMask _modelLayer;
     [SerializeField] private CameraListPanel _cameraList;
 
+    [SerializeField] private ResultsUIManager _resultsUIManager; // Drag & assign in Inspector
+    private List<ResultsUIData.CameraData> _cameraResults = new List<ResultsUIData.CameraData>();
+    private List<ResultsUIData.FeatureData> _featureResults = new List<ResultsUIData.FeatureData>();
+
+    private Dictionary<Camera, CameraCapture> _cameraCapture= new Dictionary<Camera, CameraCapture>();
+
     private Camera _inspectionCamera;
     private string _savedDataFolder = @"C:\temp";
     private int _resultCount;
+
+
 
     private void Awake()
     {
@@ -22,44 +30,149 @@ public class InspectionSystem : MonoBehaviour
     }
     public void CalculatePointData()
     {
-        Camera[] allcameras= _cameraList.GetAllCamera();
-        foreach (Camera cam in allcameras)
+        Camera[] allCameras = InitializeDataAndGetCameras();
+
+        Dictionary<GameObject, AggregatedPointData> aggregatedData = InitializeAggregationData();
+
+        foreach (Camera cam in allCameras)
         {
-            _inspectionCamera= cam;
-            _pointDataList.Clear();
-            foreach (var point in _points)
-            {
-                Vector3 positionInWorldSpace = point.transform.position;
-                Vector3 positionInCameraSpace = _inspectionCamera.transform.InverseTransformPoint(positionInWorldSpace);
-
-
-
-                bool inFOV = CameraUtils.IsPointVisibleInCameraFOV(positionInWorldSpace, _inspectionCamera);
-                bool occluded = CameraUtils.IsPointOccluded(point, _inspectionCamera);
-                bool visible = inFOV && !occluded;
-
-                float? angle = CameraUtils.GetSurfaceAngleToCamera(positionInWorldSpace, _inspectionCamera, _modelLayer);
-                float distanceMM = CameraUtils.DistanceToPointInMM(positionInWorldSpace, _inspectionCamera);
-
-                _pointDataList.Add(new PointData
-                {
-                    PositionInWorldCordinate = positionInWorldSpace,
-                    PositionInCameraCordinate = positionInCameraSpace,
-                    IsVisible = visible,
-                    IsOccluded = occluded,
-                    IsInFov = inFOV,
-                    SurfaceAngle = angle.ToString(),
-                    DistanceToPointMM = distanceMM
-                });
-
-                SetColor(point, inFOV, occluded, angle);
-            }
-
-
-            ShowPointData(_inspectionCamera.name);
-            SaveInspectionCameraImage(_inspectionCamera);
+            ProcessCamera(cam, aggregatedData);
         }
 
+        ApplyFinalPointColors(aggregatedData);
+        UpdateUIAndResultCount();
+    }
+
+    
+
+    private Camera[] InitializeDataAndGetCameras()
+    {
+        _cameraResults.Clear();
+        _featureResults.Clear();
+        _cameraCapture.Clear();
+
+        Camera[] allCameras = _cameraList.GetAllCamera();
+        foreach (Camera cam in allCameras)
+        {
+            _cameraCapture[cam] = cam.GetComponent<CameraCapture>();
+        }
+
+        return allCameras;
+    }
+
+
+    private Dictionary<GameObject, AggregatedPointData> InitializeAggregationData()
+    {
+        var aggregatedData = new Dictionary<GameObject, AggregatedPointData>();
+        foreach (var point in _points)
+        {
+            aggregatedData[point] = new AggregatedPointData();
+        }
+        return aggregatedData;
+    }
+
+    private void ProcessCamera(Camera cam, Dictionary<GameObject, AggregatedPointData> aggregatedData)
+    {
+        _inspectionCamera = cam;
+        _pointDataList.Clear();
+
+        AddCameraResult(cam);
+
+        foreach (var point in _points)
+        {
+            ProcessPoint(point, cam, aggregatedData);
+        }
+
+        ShowPointData(cam.name);
+        SaveInspectionCameraImage(cam);
+    }
+
+    private void AddCameraResult(Camera cam)
+    {
+        var camData = _cameraCapture[cam].GetCameraData(cam);
+
+        _cameraResults.Add(new ResultsUIData.CameraData
+        {
+            id = cam.name,
+            model = camData.cameraIntrinsics.cameraModel,
+            lensModel = camData.cameraIntrinsics.lensModel,
+            position = cam.transform.position,
+            rotation = cam.transform.eulerAngles
+        });
+    }
+
+    private void ProcessPoint(GameObject point, Camera cam, Dictionary<GameObject, AggregatedPointData> aggregatedData)
+    {
+        Vector3 worldPos = point.transform.position;
+        Vector3 cameraPos = cam.transform.InverseTransformPoint(worldPos);
+
+        bool inFOV = CameraUtils.IsPointVisibleInCameraFOV(worldPos, cam);
+        bool occluded = CameraUtils.IsPointOccluded(point, cam);
+        bool visible = inFOV && !occluded;
+
+        float? angle = CameraUtils.GetSurfaceAngleToCamera(worldPos, cam, _modelLayer);
+        float distanceMM = CameraUtils.DistanceToPointInMM(worldPos, cam);
+        Vector2 pixelsAtPoint = _cameraCapture[cam].GetPixelsAtPoint(cameraPos.z);
+
+        // Aggregate data
+        var data = aggregatedData[point];
+        if (inFOV) data.InFOV = true;
+        if (visible) data.IsVisibleInAny = true;
+        if (angle != null) data.HasNonNullAngle = true;
+
+        // Store feature data to display in UI
+        _featureResults.Add(new ResultsUIData.FeatureData
+        {
+            featureID = point.name,
+            cameraID = cam.name,
+            worldCoord = worldPos,
+            cameraCoord = cameraPos,
+            distance = distanceMM,
+            surfaceAngle = angle.ToString(),
+            pixelSize = pixelsAtPoint,
+            isVisible = visible,
+            isOccluded = occluded,
+            inFOV = inFOV
+        });
+
+        //store point/ feature date to save in json file.
+        _pointDataList.Add(new PointData
+        {
+            FeatureID = point.name,
+            PositionInWorldCordinate = worldPos,
+            PositionInCameraCordinate = cameraPos,
+            IsVisible = visible,
+            IsOccluded = occluded,
+            IsInFov = inFOV,
+            SurfaceAngle = angle.ToString(),
+            DistanceToPointMM = distanceMM
+        });
+
+        SetColor(point, inFOV, occluded, angle);
+    }
+
+    private void ApplyFinalPointColors(Dictionary<GameObject, AggregatedPointData> aggregatedData)
+    {
+        foreach (var kvp in aggregatedData)
+        {
+            GameObject point = kvp.Key;
+            var data = kvp.Value;
+
+            bool finalInFOV = data.InFOV;
+            bool finalVisible = data.IsVisibleInAny;
+            bool finalHasAngle = data.HasNonNullAngle;
+
+            bool finalOccluded = finalInFOV && !finalVisible;
+            float? dummyAngle = finalHasAngle ? 45f : (float?)null;
+
+            SetColor(point, finalInFOV, finalOccluded, dummyAngle);
+        }
+    }
+
+    private void UpdateUIAndResultCount()
+    {
+        _resultsUIManager.PopulateCameraSummary(_cameraResults);
+        _resultsUIManager.PopulateFeatureSummary(_featureResults);
         UpdateResultCount();
     }
 
@@ -68,27 +181,35 @@ public class InspectionSystem : MonoBehaviour
         var renderer = point.GetComponent<Renderer>();
         if (renderer != null)
         {
-            renderer.material.color = Color.red;
+            MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
+            //renderer.material.color = Color.red;
+            propertyBlock.SetColor("_Color", Color.red);
+
             if (inFov)
             {
-                renderer.material.color= Color.green;
+               // renderer.material.color= Color.green;
+                propertyBlock.SetColor("_Color", Color.green);
+
                 if (isOccluded)
                 {
-                    renderer.material.color = Color.blue;
+                   // renderer.material.color = Color.blue;
+                    propertyBlock.SetColor("_Color", Color.blue);
+
                 }
-               else if (angle == null)
+                else if (angle == null)
                 {
-                    renderer.material.color = Color.yellow;
+                   // renderer.material.color = Color.yellow;
+                    propertyBlock.SetColor("_Color", Color.yellow);
 
                 }
             }
            
-            
+            renderer.SetPropertyBlock(propertyBlock);
            
         }
     }
 
-
+  
 
     public void SpawnPoints(int count, Vector3[] pos, string[] name)
     {
@@ -105,7 +226,7 @@ public class InspectionSystem : MonoBehaviour
 
     public void ShowPointData(string camName)
     {
-        CameraData camData = _inspectionCamera.transform.GetComponent<CameraCapture>().GetCameraData(_inspectionCamera);
+        CameraData camData = _cameraCapture[_inspectionCamera].GetCameraData(_inspectionCamera);
        
         Vector3 CameraRot = new Vector3(
         WrapAngle(_inspectionCamera.transform.eulerAngles.x),
@@ -170,6 +291,12 @@ public class InspectionSystem : MonoBehaviour
         public List<PointData> points;
 
     }
-   
-    
+
+    private class AggregatedPointData
+    {
+        public bool InFOV = false;
+        public bool HasNonNullAngle = false;
+        public bool IsVisibleInAny = false;
+        public bool AllAnglesNull = true;
+    }
 }

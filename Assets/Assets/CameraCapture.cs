@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using Unity.Collections;
 using UnityEngine;
 
 #region Data Structures
@@ -230,5 +231,16 @@ public class CameraCapture : MonoBehaviour
         cameraData.rotation = cam.transform.rotation;
         cameraData.worldToCameraMatrix = cam.worldToCameraMatrix;
         return cameraData;
+    }
+    public Vector2 GetPixelsAtPoint(float Z)
+    {
+       
+        float FOVh= (float)intrinsics.horizontalFOV;
+        float FOVv= (float)intrinsics.verticalFOV;
+        float PixelSizeH = 2 * Z * Mathf.Tan(FOVh / 2) / imageWidth;
+        float PixelSizeV = 2 * Z * Mathf.Tan(FOVv / 2) / imageHeight;
+
+
+        return new Vector2(PixelSizeH, PixelSizeV);
     }
 }
